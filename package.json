@@ -1,0 +1,16 @@
+{
+  "name": "tcp-stream-replay-check",
+  "version": "1.0.0",
+  "description": "航电地面站 TCP 指令流复核：IP 分片重组、乱序/重传/回绕处理与长度前缀 ASCII 指令重建",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "gensamples": "node samples/generate.mjs",
+    "verify": "node verify/verify.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

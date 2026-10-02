@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>断续链路 TCP 指令流复核</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>断续链路 TCP 指令流复核</h1>
+  <p class="subtitle">IP 分片重组 · 乱序/重传/32 位回绕 · 长度前缀 ASCII 指令重建 · 冲突即拒</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>1. 受检 TCP 五元组</h2>
+    <form id="tuple-form" class="tuple-grid" autocomplete="off">
+      <label>源 IPv4
+        <input id="srcIp" type="text" inputmode="decimal" placeholder="10.0.0.10" required>
+      </label>
+      <label>源端口
+        <input id="srcPort" type="number" min="1" max="65535" placeholder="5100" required>
+      </label>
+      <label>目的 IPv4
+        <input id="dstIp" type="text" inputmode="decimal" placeholder="10.0.0.20" required>
+      </label>
+      <label>目的端口
+        <input id="dstPort" type="number" min="1" max="65535" placeholder="8080" required>
+      </label>
+      <label>协议
+        <select id="proto" disabled>
+          <option>TCP</option>
+        </select>
+      </label>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>2. Base64 classic PCAP（Ethernet II，≤ 256 KiB）</h2>
+    <textarea id="pcap" spellcheck="false"
+      placeholder="在此粘贴 classic PCAP 的 Base64 文本（允许换行）…"></textarea>
+    <div class="row">
+      <div id="size-meter" class="meter">0 / 262144 字节</div>
+      <div class="spacer"></div>
+      <button id="btn-sample-good" type="button" class="ghost">载入通过样例</button>
+      <button id="btn-sample-conflict" type="button" class="ghost">载入冲突样例</button>
+      <button id="btn-verify" type="button" class="primary">发起复核</button>
+      <button id="btn-clear" type="button" class="danger">清空草稿</button>
+    </div>
+  </section>
+
+  <section id="result" class="card hidden" aria-live="assertive"></section>
+</main>
+
+<footer>
+  <span>所有重组与判定均在本页本地完成，不上传抓包内容。</span>
+</footer>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

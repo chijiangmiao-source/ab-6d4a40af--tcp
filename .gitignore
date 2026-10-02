@@ -13,3 +13,6 @@ __pycache__/
 .yarn-cache/
 *.pyc
 *.pyo
+
+# 样例为构建期生成物（npm run gensamples / Docker build）
+public/samples/
