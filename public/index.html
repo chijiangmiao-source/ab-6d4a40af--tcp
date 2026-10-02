@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>航电断续链路 · TCP 指令流复核</title>
+<style>
+  :root {
+    --bg:#0e1420; --panel:#161f2e; --line:#273449; --txt:#dce6f2;
+    --muted:#8a99ad; --accent:#4ea1ff; --ok:#3fb96b; --bad:#ff5d6c;
+    --warn:#f0b429; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt);
+    font:14px/1.55 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+  header { padding:18px 24px; border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; }
+  header h1 { font-size:17px; margin:0; letter-spacing:.5px; }
+  header .sub { color:var(--muted); font-size:12.5px; }
+  main { max-width:1180px; margin:0 auto; padding:22px 24px 60px; }
+  .panel { background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:16px 18px; margin-bottom:18px; }
+  .panel h2 { font-size:13.5px; margin:0 0 12px; color:var(--accent);
+    text-transform:uppercase; letter-spacing:1px; }
+  label { display:block; font-size:12.5px; color:var(--muted); margin:10px 0 4px; }
+  textarea, input, select {
+    width:100%; background:#0c1320; color:var(--txt);
+    border:1px solid var(--line); border-radius:6px; padding:8px 10px;
+    font-family:var(--mono); font-size:13px; outline:none;
+  }
+  textarea { min-height:130px; resize:vertical; }
+  textarea:focus, input:focus, select:focus { border-color:var(--accent); }
+  .grid5 { display:grid; grid-template-columns:1.3fr 1.3fr .8fr .8fr .7fr; gap:12px; }
+  .btns { margin-top:14px; display:flex; gap:10px; align-items:center; }
+  button { border:0; border-radius:6px; padding:9px 20px; font-size:13.5px;
+    cursor:pointer; font-weight:600; }
+  button.primary { background:var(--accent); color:#081424; }
+  button.primary:disabled { opacity:.45; cursor:not-allowed; }
+  button.ghost { background:transparent; color:var(--muted); border:1px solid var(--line); }
+  button.ghost:hover { color:var(--txt); border-color:var(--accent); }
+  .hint { color:var(--muted); font-size:12px; }
+  .meter { font-family:var(--mono); font-size:12px; color:var(--muted); margin-left:auto; }
+  .meter.over { color:var(--bad); }
+  .verdict { border-radius:10px; padding:14px 18px; margin-bottom:18px;
+    border:1px solid var(--line); display:none; }
+  .verdict.show { display:block; }
+  .verdict.ok  { border-color:var(--ok); background:rgba(63,185,107,.08); }
+  .verdict.bad { border-color:var(--bad); background:rgba(255,93,108,.08); }
+  .verdict .v-title { font-weight:700; font-size:15px; margin-bottom:6px;
+    display:flex; align-items:center; gap:8px; }
+  .verdict.ok  .v-title { color:var(--ok); }
+  .verdict.bad .v-title { color:var(--bad); }
+  .loc { font-family:var(--mono); background:#0c1320; border:1px solid var(--line);
+    border-radius:6px; padding:10px 12px; margin-top:8px; font-size:12.5px;
+    white-space:pre-wrap; word-break:break-all; }
+  .loc b { color:var(--bad); }
+  table { width:100%; border-collapse:collapse; font-size:12.8px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line);
+    vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  td.mono, .mono { font-family:var(--mono); }
+  .cmdtext { font-family:var(--mono); color:#cfe8ff; white-space:pre-wrap;
+    word-break:break-all; }
+  .pkt-chip { display:inline-block; min-width:26px; text-align:center;
+    background:#0c1320; border:1px solid var(--line); border-radius:4px;
+    padding:1px 7px; margin:1px 3px 1px 0; font-family:var(--mono); font-size:12px; }
+  details { margin-top:6px; }
+  summary { cursor:pointer; color:var(--muted); font-size:12px; }
+  .meta-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+    gap:8px 18px; font-size:12.8px; }
+  .meta-grid div b { color:var(--muted); font-weight:500; margin-right:6px; }
+  .meta-grid .mono { color:#cfe8ff; }
+  .note { color:var(--muted); font-size:12px; margin-top:10px; }
+  .note code { color:var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>航电地面站 · 断续链路 TCP 指令流复核</h1>
+  <span class="sub">Base64 classic PCAP · Ethernet II / IPv4 / TCP · IP 分片重组 · 乱序 / 32 位回绕 / 重传冲突仲裁</span>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>1 · 捕获与受检五元组</h2>
+    <label for="pcap">粘贴 Base64 classic PCAP（≤ 256 KiB）</label>
+    <textarea id="pcap" spellcheck="false" autocomplete="off"
+      placeholder="例如以 base64 capture.pcap 得到的文本，可含换行"></textarea>
+    <div class="grid5">
+      <div>
+        <label for="srcIp">源 IPv4</label>
+        <input id="srcIp" placeholder="10.0.0.10" inputmode="decimal">
+      </div>
+      <div>
+        <label for="dstIp">目的 IPv4</label>
+        <input id="dstIp" placeholder="10.0.0.20" inputmode="decimal">
+      </div>
+      <div>
+        <label for="srcPort">源端口</label>
+        <input id="srcPort" placeholder="40123" inputmode="numeric">
+      </div>
+      <div>
+        <label for="dstPort">目的端口</label>
+        <input id="dstPort" placeholder="5010" inputmode="numeric">
+      </div>
+      <div>
+        <label for="protocol">协议</label>
+        <select id="protocol"><option>TCP</option></select>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="primary" id="btnReview">发起复核</button>
+      <button class="ghost" id="btnClear">清空草稿</button>
+      <button class="ghost" id="btnSample">填入本题样例</button>
+      <span class="meter" id="meter">0 / 262144 字节</span>
+    </div>
+    <p class="note">浏览器仅接受 Ethernet II、IPv4 与 TCP；先核对 IPv4 头校验和并按
+      <code>源 / 目的 / 协议 / 标识</code> 重组分片，再以 SYN 锚定起始序号。
+      任何缺片、截断、校验和错误、缺失 SYN、流内空洞或同序号字节冲突，都会<b style="color:var(--bad)">作废全部旧结论</b>并定位首个原始包号、偏移与冲突区间。</p>
+  </section>
+
+  <section id="verdict" class="verdict" aria-live="assertive"></section>
+
+  <section class="panel" id="resultPanel" style="display:none">
+    <h2>2 · 按序重建的长度前缀 ASCII 指令</h2>
+    <div class="meta-grid" id="meta"></div>
+    <div style="margin-top:14px; overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:44px">#</th>
+            <th style="width:80px">长度前缀</th>
+            <th>指令（ASCII 载荷）</th>
+            <th style="width:220px">原始包号</th>
+            <th style="width:300px">流字节区间 / TCP 序号</th>
+          </tr>
+        </thead>
+        <tbody id="cmdBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+import { reviewPcap, VerifyError } from './pcap-engine.mjs';
+
+const $ = (id) => document.getElementById(id);
+const pcapEl = $('pcap'), meter = $('meter');
+const MAX = 256 * 1024;
+
+function updateMeter() {
+  const n = pcapEl.value.length;
+  meter.textContent = `${n} / ${MAX} 字节`;
+  meter.classList.toggle('over', n > MAX);
+}
+pcapEl.addEventListener('input', updateMeter);
+
+/* 清空草稿：输入、旧结论、错误全部清除 */
+function clearAll() {
+  for (const id of ['pcap','srcIp','dstIp','srcPort','dstPort']) $(id).value = '';
+  updateMeter();
+  const v = $('verdict');
+  v.className = 'verdict'; v.innerHTML = '';
+  $('resultPanel').style.display = 'none';
+  $('cmdBody').innerHTML = '';
+  $('meta').innerHTML = '';
+}
+$('btnClear').addEventListener('click', clearAll);
+
+$('btnSample').addEventListener('click', async () => {
+  try {
+    const r = await fetch('./samples/avionics-capture.b64');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    pcapEl.value = await r.text();
+    $('srcIp').value = '10.0.0.10';
+    $('dstIp').value = '10.0.0.20';
+    $('srcPort').value = '40123';
+    $('dstPort').value = '5010';
+    updateMeter();
+  } catch (e) {
+    const v = $('verdict');
+    v.className = 'verdict show bad';
+    v.innerHTML = `<div class="v-title">✗ 样例加载失败</div><div>${esc(e.message)}</div>`;
+  }
+});
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function showError(err) {
+  // 规则要求：一旦失败，先清除旧结论，再展示定位信息
+  $('resultPanel').style.display = 'none';
+  $('cmdBody').innerHTML = '';
+  $('meta').innerHTML = '';
+  const v = $('verdict');
+  v.className = 'verdict show bad';
+  const loc = err instanceof VerifyError ? err.loc : null;
+  let locHtml = '';
+  if (loc) {
+    locHtml = `<div class="loc">` +
+      `<b>首个原始包号：#${loc.packet}</b>\n` +
+      `帧内偏移：${loc.offset}\n` +
+      (loc.range ? `冲突/缺失区间：${esc(loc.range)}\n` : '') +
+      (loc.detail ? `判定类型：${esc(loc.detail)}` : '') +
+      `</div>`;
+  }
+  v.innerHTML = `<div class="v-title">✗ 复核未通过 — 已作废任何既有结论，不输出指令流</div>
+    <div>${esc(err && err.message || String(err))}</div>${locHtml}`;
+}
+
+function showOk(r) {
+  const v = $('verdict');
+  v.className = 'verdict show ok';
+  v.innerHTML = `<div class="v-title">✓ 复核通过：FIN 前字节连续，共 ${r.commands.length} 条指令</div>
+    <div>所有分片已重组、重传内容一致、长度前缀恰好覆盖完整 ASCII 载荷，无尾随残字节。</div>`;
+
+  $('meta').innerHTML = `
+    <div><b>受检方向</b><span class="mono">${r.flow.srcIp}:${r.flow.srcPort} → ${r.flow.dstIp}:${r.flow.dstPort} / ${r.flow.protocol}</span></div>
+    <div><b>ISN (SYN)</b><span class="mono">${r.isn}</span></div>
+    <div><b>FIN 结束序号</b><span class="mono">${r.finSeq}</span></div>
+    <div><b>有效字节数</b><span class="mono">${r.streamBytes}</span></div>
+    <div><b>PCAP 总包数</b><span class="mono">${r.packetsTotal}</span></div>
+    <div><b>命中方向段数</b><span class="mono">${r.segmentsMatched}</span></div>`;
+
+  $('cmdBody').innerHTML = r.commands.map((c) => {
+    const chips = c.packets.map((p) => `<span class="pkt-chip">#${p}</span>`).join('');
+    const spanRows = c.spans.map((s) => `
+      <div>包 #${s.packet}：流字节 [${s.streamOffset[0]}, ${s.streamOffset[1]})
+        ｜帧偏移 [${s.frameOffset[0]}, ${s.frameOffset[1]})
+        ｜TCP seq [${s.tcpSeq[0]}, ${s.tcpSeq[1]})</div>`).join('');
+    return `<tr>
+      <td class="mono">${c.index}</td>
+      <td class="mono">${c.lengthPrefix}</td>
+      <td class="cmdtext">${esc(c.text) || '<span style="color:var(--muted)">（空载荷）</span>'}</td>
+      <td>${chips}
+        <details><summary>每包字节区间</summary><div class="mono" style="margin-top:4px;font-size:11.5px;color:var(--muted)">${spanRows}</div></details>
+      </td>
+      <td class="mono" style="font-size:11.8px;color:var(--muted)">
+        流 [${c.streamOffset[0]}, ${c.streamOffset[1]})<br>
+        seq [${c.tcpSeqRange[0]}, ${c.tcpSeqRange[1]})
+      </td>
+    </tr>`;
+  }).join('');
+  $('resultPanel').style.display = '';
+}
+
+$('btnReview').addEventListener('click', () => {
+  try {
+    const r = reviewPcap(pcapEl.value, {
+      srcIp: $('srcIp').value,
+      dstIp: $('dstIp').value,
+      srcPort: $('srcPort').value,
+      dstPort: $('dstPort').value,
+      protocol: $('protocol').value,
+    });
+    showOk(r);
+  } catch (e) {
+    showError(e);
+  }
+});
+
+updateMeter();
+</script>
+</body>
+</html>

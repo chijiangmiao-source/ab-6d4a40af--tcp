@@ -1,0 +1,14 @@
+{
+  "name": "avionics-link-review",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "航电地面站：断续链路 TCP 长度前缀 ASCII 指令流复核",
+  "scripts": {
+    "start": "node server.mjs",
+    "verify": "node verify/verify.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

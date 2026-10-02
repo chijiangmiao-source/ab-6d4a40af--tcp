@@ -1,0 +1,43 @@
+# 航电断续链路 TCP 指令流复核
+#
+#   web     —— 静态页面 + /healthz，端口可配置
+#   verify  —— 一次性复核服务：重组规则测试 + 页面构建检查 + HTTP 冒烟，
+#              运行一次后即以退出码结束（0 全通过 / 1 有失败）
+#
+# 宿主端口：HOST_PORT（默认 8080）
+# 容器端口：PORT（默认 8080）
+#
+# 用法：
+#   docker compose up --build web
+#   docker compose run --rm verify
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: avionics-link-review:latest
+    environment:
+      PORT: "8080"
+      HOST: "0.0.0.0"
+    ports:
+      # 仅左值（宿主侧）可配置，右值为容器内监听端口
+      - "${HOST_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  verify:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: avionics-link-review:latest
+    environment:
+      PORT: "0"
+      HOST: "127.0.0.1"
+    # verify 内部自己拉起一个临时静态服务做 HTTP 冒烟；不发布端口
+    command: ["node", "verify/verify.mjs"]
+    restart: "no"

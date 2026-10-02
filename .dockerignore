@@ -1,0 +1,6 @@
+.git
+.gitignore
+node_modules
+.npm-cache
+*.log
+.DS_Store
